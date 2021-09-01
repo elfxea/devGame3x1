@@ -9,7 +9,7 @@
 #include "core/encoder_decoder.h"
 #include "core/frame_reader.h"
 #include "core/filter_image.h"
-#include "core/life_game.h"
+#include "core/image_class.h"
 
 #include "core/check_setup.h"
 
@@ -36,8 +36,8 @@ int main() {
 
     Image image(grid);
     image.play(1);
-//    image.mesh();
-//    image.play();
+    image.mesh();
+    image.play();
 
     grid = image.get(true);
     write_tmp_img(grid, 0, pow(2, 15));
