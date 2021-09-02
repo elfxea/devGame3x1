@@ -1,27 +1,15 @@
 //
 // Created by Михаил on 27.08.2021.
 //
-#define TEMP_IMAGE_DATA_FILENAME "image_data.tmp" // Temporary image data file
-#define TEMP_IMAGE_RAW_DATA "raw_image_data.tmp" // decoded image file
-#define TEMP_GRAYSCALE_RAW_DATA "raw_grayscaled_image.tmp"
-#define TEMP_GRAYSCALE_IMAGE "grayscaled_image.tmp"
 
 #ifndef GAME3X1_DECODE_IDATA_H
 #define GAME3X1_DECODE_IDATA_H
 
 #endif //GAME3X1_DECODE_IDATA_H
 
-void write_temporary_data(std::ifstream &FILE_from, const unsigned int length) {
-    std::ofstream buffer(TEMP_IMAGE_DATA_FILENAME);
-    for (unsigned int i = 0; i < length; ++i) {
-        buffer.put(FILE_from.get());
-    }
-    buffer.close();
-}
-
 bool decode(const unsigned int chunk_size) {
-    FILE *src = fopen(TEMP_IMAGE_DATA_FILENAME, "r");
-    FILE *dest = fopen(TEMP_IMAGE_RAW_DATA, "w");
+    FILE *src = fopen(TEMP_IMAGE_DATA_FILENAME, "rb");
+    FILE *dest = fopen(TEMP_IMAGE_RAW_DATA, "wb");
 
     uint8_t inbuff[chunk_size];
     uint8_t outbuff[chunk_size];
@@ -74,7 +62,7 @@ bool decode(const unsigned int chunk_size) {
     return true;
 }
 
-void compress(std::vector<std::vector<pixel>> &grid, unsigned int compression_level, unsigned int chunk_size) {
+bool encode(std::vector<std::vector<pixel>> &grid, unsigned int compression_level, unsigned int chunk_size) {
     FILE *src = fopen(TEMP_GRAYSCALE_RAW_DATA, "wb");
     FILE *dest = fopen(TEMP_GRAYSCALE_IMAGE, "wb");
 
@@ -96,7 +84,7 @@ void compress(std::vector<std::vector<pixel>> &grid, unsigned int compression_le
 
     if (deflateInit(&stream, compression_level) != Z_OK) {
         fprintf(stderr, "deflateInit(...) failed!\n");
-        return;
+        return false;
     }
 
     int flush;
@@ -105,7 +93,7 @@ void compress(std::vector<std::vector<pixel>> &grid, unsigned int compression_le
         if (ferror(src)) {
             fprintf(stderr, "fread(...) failed!\n");
             deflateEnd(&stream);
-            return;
+            return false;
         }
 
         flush = feof(src) ? Z_FINISH : Z_NO_FLUSH;
@@ -121,7 +109,7 @@ void compress(std::vector<std::vector<pixel>> &grid, unsigned int compression_le
                 ferror(dest)) {
                 fprintf(stderr, "fwrite(...) failed!\n");
                 deflateEnd(&stream);
-                return;
+                return false;
             }
         } while (stream.avail_out == 0);
     } while (flush != Z_FINISH);
@@ -130,6 +118,7 @@ void compress(std::vector<std::vector<pixel>> &grid, unsigned int compression_le
 
     fclose(src);
     fclose(dest);
+    return true;
 }
 
 std::vector<std::vector<pixel>> get_pixel_grid(unsigned int width, unsigned int height, unsigned int bitdepth) {
