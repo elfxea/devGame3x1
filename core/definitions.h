@@ -14,7 +14,7 @@
 #define TEMP_GRAYSCALE_IMAGE "grayscaled_image.tmp"
 
 #define DEATH_INDEX 50
-#define ACTIVE_INDEX 255
-#define BIRTH_INDEX 100
+#define ACTIVE_INDEX 199
+#define BIRTH_INDEX 51
 
 #define BITDEPTH 256

@@ -70,3 +70,10 @@ struct pixel {
         A = a;
     }
 };
+
+enum row_filter_type {
+    NONE,
+    SUB,
+    UP,
+    AVERAGE
+};

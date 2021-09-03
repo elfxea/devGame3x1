@@ -20,7 +20,7 @@ private:
 
     bool grayscaled = false;
 
-    void read_std_header(std::ifstream &from) {
+    static void read_std_header(std::ifstream &from) {
         unsigned char is_text_file = from.get();
         unsigned char P = from.get();
         unsigned char N = from.get();
@@ -41,7 +41,7 @@ private:
             throw std::runtime_error("Provided file is not a PNG.");
     }
 
-    bool check_frame(std::vector<unsigned char> data, unsigned int checksum) {
+    static bool check_frame(std::vector<unsigned char> data, unsigned int checksum) {
         unsigned int calculated_checksum = crc(data, data.size());
         if (checksum != calculated_checksum)
             return false;
@@ -122,13 +122,13 @@ private:
         grayscaled = true;
     }
 
-    void death(std::vector<std::vector<pixel>> &field, const unsigned int y, const unsigned int x) {
+    static void death(std::vector<std::vector<pixel>> &field, const unsigned int y, const unsigned int x) {
         field[y][x].R = DEATH_INDEX;
         field[y][x].G = DEATH_INDEX;
         field[y][x].B = DEATH_INDEX;
     }
 
-    void alive(std::vector<std::vector<pixel>> &field, const unsigned int y, const unsigned int x) {
+    static void alive(std::vector<std::vector<pixel>> &field, const unsigned int y, const unsigned int x) {
         field[y][x].R = BIRTH_INDEX;
         field[y][x].G = BIRTH_INDEX;
         field[y][x].B = BIRTH_INDEX;
@@ -184,7 +184,7 @@ private:
         grayscaled = false;
     }
 
-    std::vector<unsigned char> transfer_to_size_t(const unsigned int needle) {
+    static std::vector<unsigned char> transfer_to_size_t(const unsigned int needle) {
 
         std::vector<unsigned char> result;
         result.push_back((needle & 0xFF000000) >> 24);
@@ -195,7 +195,7 @@ private:
         return result;
     }
 
-    void build_std_header(std::ofstream &at) {
+    static void build_std_header(std::ofstream &at) {
         at.put(0x89); // non-text file
         at.put('P');
         at.put('N');
@@ -206,8 +206,7 @@ private:
         at.put(0x0A);
     }
 
-    void build_chunk(std::ofstream &at, const std::string &chunk_name, const std::vector<unsigned char> &data) {
-        unsigned int d = data.size();
+    static void build_chunk(std::ofstream &at, const std::string &chunk_name, const std::vector<unsigned char> &data) {
         std::vector<unsigned char> size = transfer_to_size_t(data.size());
         for (unsigned int i = 0; i < 4; ++i)
             at.put(size[i]);
@@ -242,8 +241,7 @@ private:
                     tmp.put(i);
                 }
                 data.clear();
-            }
-            else if (
+            } else if (
                     data[0] == 'I' &&
                     data[1] == 'E' &&
                     data[2] == 'N' &&
@@ -255,85 +253,95 @@ private:
         decode(32756);
     }
 
-    void read_RGBA(std::ifstream &from) {
+    void filter_pixel(unsigned int y, unsigned int x, row_filter_type filter_type) {
+        switch (filter_type) {
+            case NONE: {
+                break;
+            }
+            case SUB: {
+                if (x == 0)
+                    break;
+                grid_[y][x].R += grid_[y][x - 1].R;
+                grid_[y][x].G += grid_[y][x - 1].G;
+                grid_[y][x].B += grid_[y][x - 1].B;
+                grid_[y][x].A += grid_[y][x - 1].A;
+                break;
+            }
+            case UP: {
+                if (y == 0)
+                    break;
+                grid_[y][x].R += grid_[y - 1][x].R;
+                grid_[y][x].G += grid_[y - 1][x].G;
+                grid_[y][x].B += grid_[y - 1][x].B;
+                grid_[y][x].A += grid_[y - 1][x].A;
+                break;
+            }
+            case AVERAGE: {
+                if (y == 0) {
+                    if (x == 0)
+                        break;
+                    grid_[y][x].R += grid_[y][x - 1].R / 2;
+                    grid_[y][x].G += grid_[y][x - 1].G / 2;
+                    grid_[y][x].B += grid_[y][x - 1].B / 2;
+                    grid_[y][x].A += grid_[y][x - 1].A / 2;
+                } else if (x == 0) {
+                    grid_[y][x].R += grid_[y - 1][x].R / 2;
+                    grid_[y][x].G += grid_[y - 1][x].G / 2;
+                    grid_[y][x].B += grid_[y - 1][x].B / 2;
+                    grid_[y][x].A += grid_[y - 1][x].A / 2;
+                } else {
+                    grid_[y][x].R += (grid_[y - 1][x].R + grid_[y][x - 1].R) / 2;
+                    grid_[y][x].G += (grid_[y - 1][x].G + grid_[y][x - 1].G) / 2;
+                    grid_[y][x].B += (grid_[y - 1][x].B + grid_[y][x - 1].B) / 2;
+                    grid_[y][x].A += (grid_[y - 1][x].A + grid_[y][x - 1].A) / 2;
+                }
+                break;
+            }
+        }
+    }
+
+    void read_hexcolors(std::ifstream &from, bool read_alpha = false) {
         read_png(from);
 
         std::ifstream decoded_data(TEMP_IMAGE_RAW_DATA);
         grid_.resize(height_);
 
         for (unsigned int y = 0; y < height_; ++y) {
-            unsigned char filter_type;
-            filter_type = decoded_data.get();
+            row_filter_type filter_type;
 
-            switch (filter_type) {
-                case 0x0: {
-                    for (unsigned int x = 0; x < width_; ++x) {
-                        unsigned char r = decoded_data.get();
-                        unsigned char g = decoded_data.get();
-                        unsigned char b = decoded_data.get();
-                        unsigned char a = decoded_data.get();
-                        pixel temp_pixel(r, g, b, a);
-                        grid_[y].push_back(temp_pixel);
-                    }
+            unsigned char byte = decoded_data.get();
+            switch (byte) {
+                case 0x00: {
+                    filter_type = NONE;
                     break;
                 }
                 case 0x01: {
-                    unsigned char r = decoded_data.get();
-                    unsigned char g = decoded_data.get();
-                    unsigned char b = decoded_data.get();
-                    unsigned char a = decoded_data.get();
-                    pixel temp_pixel(r, g, b, a);
-                    grid_[y].push_back(temp_pixel);
-                    for (unsigned int x = 1; x < width_; ++x) {
-                        r = decoded_data.get() + grid_[y][x - 1].R;
-                        g = decoded_data.get() + grid_[y][x - 1].G;
-                        b = decoded_data.get() + grid_[y][x - 1].B;
-                        a = decoded_data.get() + grid_[y][x - 1].A;
-                        temp_pixel = *(new pixel(r, g, b, a));
-                        grid_[y].push_back(temp_pixel);
-                    }
+                    filter_type = SUB;
                     break;
                 }
                 case 0x02: {
-                    unsigned char r = decoded_data.get();
-                    unsigned char g = decoded_data.get();
-                    unsigned char b = decoded_data.get();
-                    unsigned char a = decoded_data.get();
-                    pixel temp_pixel(r, g, b, a);
-                    grid_[y].push_back(temp_pixel);
-                    for (unsigned int x = 1; x < width_; ++x) {
-                        unsigned char r = decoded_data.get() + grid_[y - 1][x].R;
-                        unsigned char g = decoded_data.get() + grid_[y - 1][x].G;
-                        unsigned char b = decoded_data.get() + grid_[y - 1][x].B;
-                        unsigned char a = decoded_data.get() + grid_[y - 1][x].A;
-                        pixel temp_pixel(r, g, b, a);
-                        grid_[y].push_back(temp_pixel);
-                    }
+                    filter_type = UP;
                     break;
                 }
                 case 0x03: {
-                    unsigned int s = decoded_data.tellg();
-                    unsigned char r = decoded_data.get() + (grid_[y - 1][0].R / 2);
-                    unsigned char g = decoded_data.get() + (grid_[y - 1][0].G / 2);
-                    unsigned char b = decoded_data.get() + (grid_[y - 1][0].B / 2);
-                    unsigned char a = decoded_data.get() + (grid_[y - 1][0].A / 2);
-                    pixel temp_pixel(r, g, b, a);
-                    grid_[y].push_back(temp_pixel);
-                    for (unsigned int x = 1; x < width_; ++x) {
-                        r = decoded_data.get() + ((grid_[y - 1][x].R + grid_[y][x - 1].R) / 2);
-                        g = decoded_data.get() + ((grid_[y - 1][x].G + grid_[y][x - 1].G) / 2);
-                        b = decoded_data.get() + ((grid_[y - 1][x].B + grid_[y][x - 1].B) / 2);
-                        a = decoded_data.get() + ((grid_[y - 1][x].A + grid_[y][x - 1].A) / 2);
-                        pixel temp_pixel(r, g, b, a);
-                        grid_[y].push_back(temp_pixel);
-                    }
+                    filter_type = AVERAGE;
                     break;
                 }
                 default: {
-                    int s = decoded_data.tellg();
                     throw std::runtime_error("Error");
-                    break;
                 }
+            }
+
+            pixel temp_pixel;
+
+            for (unsigned int x = 0; x < width_; ++x) {
+                temp_pixel.R = decoded_data.get();
+                temp_pixel.G = decoded_data.get();
+                temp_pixel.B = decoded_data.get();
+                if (read_alpha)
+                    temp_pixel.A = decoded_data.get();
+                grid_[y].push_back(temp_pixel);
+                filter_pixel(y, x, filter_type);
             }
         }
 
@@ -361,10 +369,11 @@ public:
 
         switch (source_info.color_type) {
             case 2: {
+                read_hexcolors(file);
                 break;
             }
             case 6: {
-                read_RGBA(file);
+                read_hexcolors(file, true);
                 break;
             }
         }
@@ -384,7 +393,7 @@ public:
                     unsigned int active_neighbours = count_neighbours(y, x, true);
                     if (index < DEATH_INDEX) {
                         death(grayscaled_grid_tmp, y, x);
-                    } else if (index < DEATH_INDEX && active_neighbours > 3) {
+                    } else if (index < DEATH_INDEX && active_neighbours > 4) {
                         alive(grayscaled_grid_tmp, y, x);
                     } else if (index >= DEATH_INDEX && (alive_neighbours < 2 ||
                                                         alive_neighbours > 4)) {
@@ -458,7 +467,7 @@ public:
         std::vector<unsigned char> pHYs_data = {0x0, 0x0, 0x12, 0x74, 0x0, 0x0, 0x12, 0x74, 0x01};
         build_chunk(fout, "pHYs", pHYs_data);
 
-        gray ? encode(grayscale_grid_, 0, 32768) : encode(grid_, 0, 32768);
+        gray ? encode(grayscale_grid_, 5, 32768) : encode(grid_, 5, 32768);
         std::vector<unsigned char> IDAT_data;
         std::ifstream image_data(TEMP_GRAYSCALE_IMAGE);
         unsigned char byte;
