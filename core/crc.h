@@ -35,7 +35,7 @@ void make_crc_table() {
    crc() routine below). */
 
 unsigned long update_crc(unsigned long crc, std::vector<unsigned char> &buf,
-                         int len) {
+                         unsigned int len) {
     unsigned long c = crc;
     int n;
 
@@ -48,8 +48,8 @@ unsigned long update_crc(unsigned long crc, std::vector<unsigned char> &buf,
 }
 
 /* Return the CRC of the bytes buf[0..len-1]. */
-unsigned long crc(std::vector<unsigned char> &buf, int len) {
-    return update_crc(0xffffffffL, buf, len) ^ 0xffffffffL;
+unsigned long crc(std::vector<unsigned char> &buf) {
+    return update_crc(0xffffffffL, buf, buf.size()) ^ 0xffffffffL;
 }
 
 #endif //GAME3X1_CRC_H

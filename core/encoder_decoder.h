@@ -2,10 +2,10 @@
 // Created by Михаил on 27.08.2021.
 //
 
-#ifndef GAME3X1_DECODE_IDATA_H
-#define GAME3X1_DECODE_IDATA_H
+#ifndef GAME3X1_ENCODER_DECODER_H
+#define GAME3X1_ENCODER_DECODER_H
 
-#endif //GAME3X1_DECODE_IDATA_H
+#endif //GAME3X1_ENCODER_DECODER_H
 
 bool decode(const unsigned int chunk_size) {
     FILE *src = fopen(TEMP_IMAGE_DATA_FILENAME, "rb");

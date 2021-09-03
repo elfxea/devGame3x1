@@ -26,6 +26,7 @@ int main() {
     std::string filename;
 
     filename = "output/res.png";
+    image.mesh(10);
     image.write(filename);
 
     fin.close();

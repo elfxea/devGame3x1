@@ -3,10 +3,10 @@
 //
 #include "crc.h"
 
-#ifndef GAME3X1_LIFE_GAME_H
-#define GAME3X1_LIFE_GAME_H
+#ifndef GAME3X1_IMAGE_CLASS_H
+#define GAME3X1_IMAGE_CLASS_H
 
-#endif //GAME3X1_LIFE_GAME_H
+#endif //GAME3X1_IMAGE_CLASS_H
 
 class Image {
 private:
@@ -41,14 +41,14 @@ private:
             throw std::runtime_error("Provided file is not a PNG.");
     }
 
-    static bool check_frame(std::vector<unsigned char> data, unsigned int checksum) {
-        unsigned int calculated_checksum = crc(data, data.size());
+    static bool check_frame(std::vector<unsigned char> &data, unsigned int checksum) {
+        unsigned int calculated_checksum = crc(data);
         if (checksum != calculated_checksum)
             return false;
         return true;
     }
 
-    std::vector<unsigned char> read_chunk(std::ifstream &from) {
+    static std::vector<unsigned char> read_chunk(std::ifstream &from) {
         unsigned int chunk_size = 0;
         std::string chunk_name;
         std::vector<unsigned char> data;
@@ -107,6 +107,10 @@ private:
         source_info.compression_type = data[14];
         source_info.filter_type = data[15];
         source_info.interlace = data[16];
+
+        if (pow(2, source_info.depth) != BITDEPTH) {
+            throw std::runtime_error("Unable to read images with bit depth != 8 bit.");
+        }
     }
 
     void grayscale() {
@@ -218,7 +222,7 @@ private:
         for (unsigned char i : chunk)
             at.put(i);
 
-        unsigned int checksum = crc(chunk, chunk.size());
+        unsigned int checksum = crc(chunk);
         at.put((checksum & 0xFF000000) >> 24);
         at.put((checksum & 0x00FF0000) >> 16);
         at.put((checksum & 0x0000FF00) >> 8);
