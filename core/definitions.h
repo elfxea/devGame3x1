@@ -9,9 +9,9 @@
 
 
 #define TEMP_IMAGE_DATA_FILENAME "image_data.tmp" // Temporary image data file
-#define TEMP_IMAGE_RAW_DATA "raw_image_data.tmp" // decoded image file
-#define TEMP_GRAYSCALE_RAW_DATA "raw_grayscaled_image.tmp"
-#define TEMP_GRAYSCALE_IMAGE "grayscaled_image.tmp"
+#define TEMP_IMAGE_RAW_DATA_FILENAME "raw_image_data.tmp" // decoded image file
+#define TEMP_OUTPUT_RAW_DATA_FILENAME "raw_grayscaled_image.tmp"
+#define TEMP_OUTPUT_IMAGE_FILENAME "grayscaled_image.tmp"
 
 #define DEATH_INDEX 50
 #define ACTIVE_INDEX 199

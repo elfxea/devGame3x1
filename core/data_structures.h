@@ -75,5 +75,6 @@ enum row_filter_type {
     NONE,
     SUB,
     UP,
-    AVERAGE
+    AVERAGE,
+    PAETH
 };

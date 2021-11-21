@@ -9,7 +9,7 @@
 
 bool decode(const unsigned int chunk_size) {
     FILE *src = fopen(TEMP_IMAGE_DATA_FILENAME, "rb");
-    FILE *dest = fopen(TEMP_IMAGE_RAW_DATA, "wb");
+    FILE *dest = fopen(TEMP_IMAGE_RAW_DATA_FILENAME, "wb");
 
     uint8_t inbuff[chunk_size];
     uint8_t outbuff[chunk_size];
@@ -63,8 +63,8 @@ bool decode(const unsigned int chunk_size) {
 }
 
 bool encode(std::vector<std::vector<pixel>> &grid, unsigned int compression_level, unsigned int chunk_size) {
-    FILE *src = fopen(TEMP_GRAYSCALE_RAW_DATA, "wb");
-    FILE *dest = fopen(TEMP_GRAYSCALE_IMAGE, "wb");
+    FILE *src = fopen(TEMP_OUTPUT_RAW_DATA_FILENAME, "wb");
+    FILE *dest = fopen(TEMP_OUTPUT_IMAGE_FILENAME, "wb");
 
     for (unsigned int y = 0; y < grid.size(); ++y) {
         putc('\0', src);
@@ -76,7 +76,7 @@ bool encode(std::vector<std::vector<pixel>> &grid, unsigned int compression_leve
     }
 
     fclose(src);
-    src = fopen(TEMP_GRAYSCALE_RAW_DATA, "r");
+    src = fopen(TEMP_OUTPUT_RAW_DATA_FILENAME, "r");
 
     uint8_t inbuff[chunk_size];
     uint8_t outbuff[chunk_size];
@@ -119,25 +119,4 @@ bool encode(std::vector<std::vector<pixel>> &grid, unsigned int compression_leve
     fclose(src);
     fclose(dest);
     return true;
-}
-
-std::vector<std::vector<pixel>> get_pixel_grid(unsigned int width, unsigned int height, unsigned int bitdepth) {
-    std::ifstream file(TEMP_IMAGE_RAW_DATA);
-    std::vector<std::vector<pixel>> grid;
-
-    for (unsigned int y = 0; y < height; ++y) {
-        file.get();
-        std::vector<pixel> tmp_row;
-        grid.push_back(tmp_row);
-        for (unsigned int x = 0; x < width; ++x) {
-            unsigned int redlight = file.get();
-            unsigned int greenlight = file.get();
-            unsigned int bluelight = file.get();
-
-            pixel tmp(redlight, greenlight, bluelight);
-            grid[y].push_back(tmp);
-        }
-    }
-
-    return grid;
 }

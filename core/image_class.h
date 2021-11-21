@@ -2,6 +2,7 @@
 // Created by Михаил on 01.09.2021.
 //
 #include "crc.h"
+#include "chunk_class.h"
 
 #ifndef GAME3X1_IMAGE_CLASS_H
 #define GAME3X1_IMAGE_CLASS_H
@@ -126,56 +127,6 @@ private:
         grayscaled = true;
     }
 
-    static void death(std::vector<std::vector<pixel>> &field, const unsigned int y, const unsigned int x) {
-        field[y][x].R = DEATH_INDEX;
-        field[y][x].G = DEATH_INDEX;
-        field[y][x].B = DEATH_INDEX;
-    }
-
-    static void alive(std::vector<std::vector<pixel>> &field, const unsigned int y, const unsigned int x) {
-        field[y][x].R = BIRTH_INDEX;
-        field[y][x].G = BIRTH_INDEX;
-        field[y][x].B = BIRTH_INDEX;
-    }
-
-    unsigned char
-    count_neighbours(const unsigned int y, const unsigned int x, const bool count_active_neighbours = false) const {
-        unsigned char result = 0;
-
-        const unsigned int index_y_top = (y > 0) ? y - 1 : height_ - 1;
-        const unsigned int index_x_top = x;
-
-        const unsigned int index_y_right = y;
-        const unsigned int index_x_right = (x < width_ - 1) ? x + 1 : 0;
-
-        const unsigned int index_y_bottom = (y < height_ - 1) ? y + 1 : 0;
-        const unsigned int index_x_bottom = x;
-
-        const unsigned int index_y_left = y;
-        const unsigned int index_x_left = (x > 0) ? x - 1 : width_ - 1;
-
-        const unsigned int comparison = count_active_neighbours ? ACTIVE_INDEX : DEATH_INDEX;
-
-        if (grayscale_grid_[index_y_top][index_x_top].R >= comparison)
-            result += 1;
-        if (grayscale_grid_[index_y_top][index_x_right].R >= comparison)
-            result += 1;
-        if (grayscale_grid_[index_y_right][index_x_right].R >= comparison)
-            result += 1;
-        if (grayscale_grid_[index_y_bottom][index_x_right].R >= comparison)
-            result += 1;
-        if (grayscale_grid_[index_y_bottom][index_x_bottom].R >= comparison)
-            result += 1;
-        if (grayscale_grid_[index_y_bottom][index_x_left].R >= comparison)
-            result += 1;
-        if (grayscale_grid_[index_y_left][index_x_left].R >= comparison)
-            result += 1;
-        if (grayscale_grid_[index_y_top][index_x_left].R >= comparison)
-            result += 1;
-
-        return result;
-    }
-
     void append_grayscaled() {
         for (unsigned int y = 0; y < height_; ++y) {
             for (unsigned int x = 0; x < width_; ++x) {
@@ -211,25 +162,13 @@ private:
     }
 
     static void build_chunk(std::ofstream &at, const std::string &chunk_name, const std::vector<unsigned char> &data) {
-        std::vector<unsigned char> size = transfer_to_size_t(data.size());
-        for (unsigned int i = 0; i < 4; ++i)
-            at.put(size[i]);
-        std::vector<unsigned char> chunk;
-        for (char i : chunk_name)
-            chunk.push_back(i);
-        for (unsigned char i : data)
-            chunk.push_back(i);
-        for (unsigned char i : chunk)
-            at.put(i);
-
-        unsigned int checksum = crc(chunk);
-        at.put((checksum & 0xFF000000) >> 24);
-        at.put((checksum & 0x00FF0000) >> 16);
-        at.put((checksum & 0x0000FF00) >> 8);
-        at.put((checksum & 0x000000FF));
+        Chunk tmp(chunk_name);
+        tmp.push(data);
+        for (unsigned char data_byte : tmp.get())
+            at.put(data_byte);
     }
 
-    void read_png(std::ifstream &from) {
+    static void read_png(std::ifstream &from) {
         std::ofstream tmp(TEMP_IMAGE_DATA_FILENAME);
         while (!from.eof()) {
             std::vector<unsigned char> data = read_chunk(from);
@@ -257,6 +196,69 @@ private:
         decode(32756);
     }
 
+    pixel paeth_predictor(int y, int x) {
+        pixel current = grid_[y][x];
+        pixel left = grid_[y][x - 1];
+        pixel above = grid_[y - 1][x];
+        pixel above_left = grid_[y - 1][x - 1];
+        
+        unsigned char paeth_red = 0;
+        unsigned char paeth_green = 0;
+        unsigned char paeth_blue = 0;
+        
+        paeth_red += left.R;
+        paeth_red += above.R;
+        paeth_red -= above_left.R;
+        
+        paeth_green += left.G;
+        paeth_green += above.G;
+        paeth_green -= above_left.G;
+        
+        paeth_blue += left.B;
+        paeth_blue += above.B;
+        paeth_blue -= above_left.B;
+
+        unsigned char paeth_left_red = paeth_red > left.R ? paeth_red - left.R : left.R - paeth_red;
+        unsigned char paeth_left_green = paeth_green > left.G ? paeth_green - left.G : left.G - paeth_green;
+        unsigned char paeth_left_blue = paeth_blue > left.B ? paeth_blue - left.B : left.B - paeth_blue;
+
+        unsigned char paeth_above_red = paeth_red > above.R ? paeth_red - above.R : above.R - paeth_red;
+        unsigned char paeth_above_green = paeth_green > above.G ? paeth_green - above.G : above.G - paeth_green;
+        unsigned char paeth_above_blue = paeth_blue > above.B ? paeth_blue - above.B : above.B - paeth_blue;
+
+        unsigned char paeth_above_left_red = paeth_red > above_left.R ? paeth_red - above_left.R : above_left.R - paeth_red;
+        unsigned char paeth_above_left_green = paeth_green > above_left.G ? paeth_green - above_left.G : above_left.G - paeth_green;
+        unsigned char paeth_above_left_blue = paeth_blue > above_left.B ? paeth_blue - above_left.B : above_left.B - paeth_blue;
+        
+        unsigned char red;
+        unsigned char green;
+        unsigned char blue;
+
+        if ((paeth_left_red <= paeth_above_red) && paeth_left_red <= paeth_above_left_red)
+            red = left.R;
+        else if (paeth_above_red <= paeth_above_left_red)
+            red = above.R;
+        else
+            red = above_left.R;
+
+        if ((paeth_left_green <= paeth_above_green) && paeth_left_green <= paeth_above_left_green)
+            green = left.G;
+        else if (paeth_above_green <= paeth_above_left_green)
+            green = above.G;
+        else
+            green = above_left.G;
+
+        if ((paeth_left_blue <= paeth_above_blue) && paeth_left_blue <= paeth_above_left_blue)
+            blue = left.B;
+        else if (paeth_above_blue <= paeth_above_left_blue)
+            blue = above.B;
+        else
+            blue = above_left.B;
+        
+        pixel tmp(red, green, blue);
+        return tmp;
+    }
+
     void filter_pixel(unsigned int y, unsigned int x, row_filter_type filter_type) {
         switch (filter_type) {
             case NONE: {
@@ -266,8 +268,11 @@ private:
                 if (x == 0)
                     break;
                 grid_[y][x].R += grid_[y][x - 1].R;
+                grid_[y][x].R %= 256;
                 grid_[y][x].G += grid_[y][x - 1].G;
+                grid_[y][x].G %= 256;
                 grid_[y][x].B += grid_[y][x - 1].B;
+                grid_[y][x].B %= 256;
                 grid_[y][x].A += grid_[y][x - 1].A;
                 break;
             }
@@ -275,8 +280,11 @@ private:
                 if (y == 0)
                     break;
                 grid_[y][x].R += grid_[y - 1][x].R;
+                grid_[y][x].R %= 256;
                 grid_[y][x].G += grid_[y - 1][x].G;
+                grid_[y][x].G %= 256;
                 grid_[y][x].B += grid_[y - 1][x].B;
+                grid_[y][x].B %= 256;
                 grid_[y][x].A += grid_[y - 1][x].A;
                 break;
             }
@@ -285,19 +293,48 @@ private:
                     if (x == 0)
                         break;
                     grid_[y][x].R += grid_[y][x - 1].R / 2;
+                    grid_[y][x].R %= 256;
                     grid_[y][x].G += grid_[y][x - 1].G / 2;
+                    grid_[y][x].G %= 256;
                     grid_[y][x].B += grid_[y][x - 1].B / 2;
+                    grid_[y][x].B %= 256;
                     grid_[y][x].A += grid_[y][x - 1].A / 2;
                 } else if (x == 0) {
                     grid_[y][x].R += grid_[y - 1][x].R / 2;
+                    grid_[y][x].R %= 256;
                     grid_[y][x].G += grid_[y - 1][x].G / 2;
+                    grid_[y][x].G %= 256;
                     grid_[y][x].B += grid_[y - 1][x].B / 2;
+                    grid_[y][x].B %= 256;
                     grid_[y][x].A += grid_[y - 1][x].A / 2;
                 } else {
                     grid_[y][x].R += (grid_[y - 1][x].R + grid_[y][x - 1].R) / 2;
+                    grid_[y][x].R %= 256;
                     grid_[y][x].G += (grid_[y - 1][x].G + grid_[y][x - 1].G) / 2;
+                    grid_[y][x].G %= 256;
                     grid_[y][x].B += (grid_[y - 1][x].B + grid_[y][x - 1].B) / 2;
+                    grid_[y][x].B %= 256;
                     grid_[y][x].A += (grid_[y - 1][x].A + grid_[y][x - 1].A) / 2;
+                }
+                break;
+            }
+            case PAETH: {
+                pixel prediction = paeth_predictor(y, x);
+
+                if (x != 0) {
+                    grid_[y][x].R += prediction.R;
+                    grid_[y][x].R %= 256;
+                    grid_[y][x].G += prediction.G;
+                    grid_[y][x].G %= 256;
+                    grid_[y][x].B += prediction.B;
+                    grid_[y][x].B %= 256;
+                } else {
+                    grid_[y][x].R += grid_[y - 1][x].R;
+                    grid_[y][x].R %= 256;
+                    grid_[y][x].G += grid_[y - 1][x].G;
+                    grid_[y][x].G %= 256;
+                    grid_[y][x].B += grid_[y - 1][x].B;
+                    grid_[y][x].B %= 256;
                 }
                 break;
             }
@@ -307,7 +344,7 @@ private:
     void read_hexcolors(std::ifstream &from, bool read_alpha = false) {
         read_png(from);
 
-        std::ifstream decoded_data(TEMP_IMAGE_RAW_DATA);
+        std::ifstream decoded_data(TEMP_IMAGE_RAW_DATA_FILENAME);
         grid_.resize(height_);
 
         for (unsigned int y = 0; y < height_; ++y) {
@@ -329,6 +366,10 @@ private:
                 }
                 case 0x03: {
                     filter_type = AVERAGE;
+                    break;
+                }
+                case 0x04: {
+                    filter_type = PAETH;
                     break;
                 }
                 default: {
@@ -361,15 +402,29 @@ public:
         height_ = pixel_grid.size();
         if (height_ < 5)
             throw std::runtime_error("Min. height is 5 px.");
+        else if (height_ > 3000)
+            throw std::runtime_error("Max. height is 3000 px.");
         width_ = pixel_grid[0].size();
         if (width_ < 5)
             throw std::runtime_error("Min. width is 5 px.");
+        else if (width_ > 3000)
+            throw std::runtime_error("Max. width is 3000 px.");
     }
 
     explicit Image(std::ifstream
                    &file) {
         read_std_header(file);
         setup(file);
+
+        if (height_ < 5)
+            throw std::runtime_error("Min. height is 5 px.");
+        else if (height_ > 3000)
+            throw std::runtime_error("Max. height is 3000 px.");
+
+        if (width_ < 5)
+            throw std::runtime_error("Min. width is 5 px.");
+        else if (width_ > 3000)
+            throw std::runtime_error("Max. width is 3000 px.");
 
         switch (source_info.color_type) {
             case 2: {
@@ -381,57 +436,6 @@ public:
                 break;
             }
         }
-    }
-
-    void play(const unsigned int generations = 1) {
-        std::vector<std::vector<pixel>> grayscaled_grid_tmp;
-
-        for (unsigned int i = 0; i < generations; ++i) {
-            if (!grayscaled)
-                grayscale();
-            grayscaled_grid_tmp = grayscale_grid_;
-            for (unsigned int y = 0; y < height_; ++y) {
-                for (unsigned int x = 0; x < width_; ++x) {
-                    unsigned int index = grayscale_grid_[y][x].R;
-                    unsigned int alive_neighbours = count_neighbours(y, x, false);
-                    unsigned int active_neighbours = count_neighbours(y, x, true);
-                    if (index < DEATH_INDEX) {
-                        death(grayscaled_grid_tmp, y, x);
-                    } else if (index < DEATH_INDEX && active_neighbours > 4) {
-                        alive(grayscaled_grid_tmp, y, x);
-                    } else if (index >= DEATH_INDEX && (alive_neighbours < 2 ||
-                                                        alive_neighbours > 4)) {
-                        death(grayscaled_grid_tmp, y, x);
-                    }
-                }
-            }
-            grayscale_grid_ = grayscaled_grid_tmp;
-        }
-        append_grayscaled();
-    }
-
-    void mesh(const unsigned int generations = 1) {
-        for (int i = 0; i < generations; ++i) {
-            for (unsigned int y = 0; y < height_; ++y) {
-                for (unsigned int x = 0; x < width_; ++x) {
-                    if (grid_[y][x].R % 2)
-                        grid_[y][x].R = (grid_[y][x].R * 3 + 1) % BITDEPTH;
-                    else
-                        grid_[y][x].R /= 2;
-
-                    if (grid_[y][x].G % 2)
-                        grid_[y][x].G = (grid_[y][x].G * 3 + 1) % BITDEPTH;
-                    else
-                        grid_[y][x].G /= 2;
-
-                    if (grid_[y][x].B % 2)
-                        grid_[y][x].B = (grid_[y][x].B * 3 + 1) % BITDEPTH;
-                    else
-                        grid_[y][x].B /= 2;
-                }
-            }
-        }
-        grayscaled = false;
     }
 
     std::vector<std::vector<pixel>> &get(const bool gray = false) {
@@ -450,6 +454,12 @@ public:
         std::vector<unsigned char> byte_width = transfer_to_size_t(width_);
         std::vector<unsigned char> byte_height = transfer_to_size_t(height_);
 
+        std::vector<unsigned char> sRGB_data = {'\0'};
+        std::vector<unsigned char> gAMA_data = {'\0', '\0', 0xB1, 0x8F};
+        std::vector<unsigned char> pHYs_data = {0x0, 0x0, 0x12, 0x74, 0x0, 0x0, 0x12, 0x74, 0x01};
+        std::vector<unsigned char> IDAT_data;
+        std::vector<unsigned char> IEND_data;
+
         for (int i = 0; i < 4; ++i)
             ihdr_data.push_back(byte_width[i]);
         for (int i = 0; i < 4; ++i)
@@ -461,20 +471,12 @@ public:
         ihdr_data.push_back(0);
 
         build_chunk(fout, "IHDR", ihdr_data);
-
-        std::vector<unsigned char> sRGB_data = {'\0'};
         build_chunk(fout, "sRGB", sRGB_data);
-
-        std::vector<unsigned char> gAMA_data = {'\0', '\0', 0xB1, 0x8F};
         build_chunk(fout, "gAMA", gAMA_data);
-
-        std::vector<unsigned char> pHYs_data = {0x0, 0x0, 0x12, 0x74, 0x0, 0x0, 0x12, 0x74, 0x01};
         build_chunk(fout, "pHYs", pHYs_data);
 
         gray ? encode(grayscale_grid_, 5, 32768) : encode(grid_, 5, 32768);
-        std::vector<unsigned char> IDAT_data;
-        std::ifstream image_data(TEMP_GRAYSCALE_IMAGE);
-        unsigned char byte;
+        std::ifstream image_data(TEMP_OUTPUT_IMAGE_FILENAME);
         while (!image_data.eof()) {
             IDAT_data.push_back(image_data.get());
         }
@@ -482,8 +484,6 @@ public:
         image_data.close();
 
         build_chunk(fout, "IDAT", IDAT_data);
-
-        std::vector<unsigned char> IEND_data;
         build_chunk(fout, "IEND", IEND_data);
 
         fout.close();

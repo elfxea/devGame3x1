@@ -21,17 +21,16 @@ int main() {
     return -1;
 #endif
 
-    std::ifstream fin("debug/test_img2.png");
+    std::ifstream fin("debug/1.png");
     Image image(fin);
     std::string filename;
 
     filename = "output/res.png";
-    image.mesh(10);
     image.write(filename);
 
     fin.close();
 
-    cleanup();
+    //cleanup();
 
     return 0;
 }
