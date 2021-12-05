@@ -1,5 +1,6 @@
 //
 // Created by Михаил on 01.09.2021.
+// CRC32 reference calculator.
 //
 
 #ifndef GAME3X1_CRC_H

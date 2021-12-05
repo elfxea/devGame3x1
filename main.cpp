@@ -3,8 +3,6 @@
 #include <vector>
 #include <math.h>
 
-#include <zlib.h>
-
 #include "core/definitions.h"
 #include "core/data_structures.h"
 #include "core/encoder_decoder.h"
@@ -21,12 +19,17 @@ int main() {
     return -1;
 #endif
 
+
+
     std::ifstream fin("debug/1.png");
     Image image(fin);
     std::string filename;
 
-    filename = "output/res.png";
     image.write(filename);
+    image.stretch_range();
+
+
+    image.write("output/test.png");
 
     fin.close();
 

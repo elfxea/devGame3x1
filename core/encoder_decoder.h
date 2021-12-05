@@ -7,12 +7,22 @@
 
 #endif //GAME3X1_ENCODER_DECODER_H
 
-bool decode(const unsigned int chunk_size) {
-    FILE *src = fopen(TEMP_IMAGE_DATA_FILENAME, "rb");
-    FILE *dest = fopen(TEMP_IMAGE_RAW_DATA_FILENAME, "wb");
+#include <zlib.h> // zlib library
 
-    uint8_t inbuff[chunk_size];
-    uint8_t outbuff[chunk_size];
+/**
+ *  * A function to decode zlib-compressed data.
+ * @requires <zlib.h>, "core/definitions.h"
+ * @param chunk_size Buffer size. The higher value is faster decoding. Default is 32756.
+ * @param input Input file name. Default is TEMP_IMAGE_DATA_FILENAME (see core/definitions.h)
+ * @param output Output file name. Default is TEMP_IMAGE_RAW_DATA_FILENAME (see core/definitions.h)
+ * @return @b True if success. Other cases is @b false
+ */
+bool decode(const std::string &input = TEMP_IMAGE_DATA_FILENAME, const std::string &output = TEMP_IMAGE_RAW_DATA_FILENAME, const unsigned int chunk_size = 32756) {
+    FILE *src = fopen(input.c_str(), "rb");
+    FILE *dest = fopen(output.c_str(), "wb");
+
+    uint8_t input_buffer[chunk_size];
+    uint8_t output_buffer[chunk_size];
     z_stream stream = {nullptr};
 
     int result = inflateInit(&stream);
@@ -22,7 +32,7 @@ bool decode(const unsigned int chunk_size) {
     }
 
     do {
-        stream.avail_in = fread(inbuff, 1, chunk_size, src);
+        stream.avail_in = fread(input_buffer, 1, chunk_size, src);
         if (ferror(src)) {
             std::cerr << "fread() at core/decode_idata.h failed.\n";
             inflateEnd(&stream);
@@ -32,11 +42,11 @@ bool decode(const unsigned int chunk_size) {
         if (stream.avail_in == 0)
             break;
 
-        stream.next_in = inbuff;
+        stream.next_in = input_buffer;
 
         do {
             stream.avail_out = chunk_size;
-            stream.next_out = outbuff;
+            stream.next_out = output_buffer;
             result = inflate(&stream, Z_NO_FLUSH);
             if (result == Z_NEED_DICT || result == Z_DATA_ERROR ||
                 result == Z_MEM_ERROR) {
@@ -47,7 +57,7 @@ bool decode(const unsigned int chunk_size) {
 
             uint32_t nbytes = chunk_size - stream.avail_out;
 
-            if (fwrite(outbuff, 1, nbytes, dest) != nbytes ||
+            if (fwrite(output_buffer, 1, nbytes, dest) != nbytes ||
                 ferror(dest)) {
                 std::cerr << "fwrite() at core/decode_idata.h failed.\n";
                 inflateEnd(&stream);

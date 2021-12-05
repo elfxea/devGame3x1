@@ -1,5 +1,6 @@
 //
 // Created by Михаил on 27.08.2021.
+// Data structures used at image_cass.h
 //
 
 #ifndef GAME3X1_DATA_STRUCTURES_H
@@ -7,6 +8,11 @@
 
 #endif //GAME3X1_DATA_STRUCTURES_H
 
+/**
+ * PNG signature structure. Used to compare given file header with a PNG standard header.
+ * @Default
+ * First 8 bytes of PNG image must be always equal to (hex) [89, 50, 4E, 47, 0D, 0A, 1A, 0A].
+ */
 struct signature {
     unsigned char is_text_file = 0x89;
     unsigned char PNG[3] = {0x50, 0x4E, 0x47};
@@ -31,6 +37,17 @@ struct signature {
         return !(*this == compare);
     }
 
+    signature &operator=(unsigned char source[8]) {
+        is_text_file = source[0];
+        PNG[0] = source[1];
+        PNG[1] = source[2];
+        PNG[2] = source[3];
+        CRLF[0] = source[4];
+        CRLF[1] = source[5];
+        DOS_EOF = source[6];
+        LF = source[7];
+    }
+
     explicit signature(const unsigned char byte_array[8]) {
         is_text_file = byte_array[0];
         PNG[0] = byte_array[1];
@@ -48,11 +65,11 @@ struct signature {
 struct IHDR {
     unsigned int width = 0;
     unsigned int height = 0;
-    unsigned char depth = 8;
+    unsigned char bitdepth = 8;
     unsigned char color_type = 0;
-    unsigned char compression_type = 0;
-    unsigned char filter_type = 0;
-    unsigned char interlace = 0;
+    unsigned char compression_type = 0; // TODO: learn to work with compressed PNGs
+    unsigned char filter_type = 0; // TODO: learn to work with different FTs
+    unsigned char interlace = 0; // TODO: add interlace
 };
 
 struct pixel {
